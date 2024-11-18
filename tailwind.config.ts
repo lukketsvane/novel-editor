@@ -1,8 +1,8 @@
+import type { Config } from 'tailwindcss'
 import animate from "tailwindcss-animate"
 import typography from "@tailwindcss/typography"
 
-/** @type {import('tailwindcss').Config} */
-export default {
+const config: Config = {
   darkMode: ["class"],
   content: [
     './pages/**/*.{ts,tsx}',
@@ -38,7 +38,7 @@ export default {
         md: "0.3rem",
         sm: "0.2rem",
       },
-      typography: (theme) => ({
+      typography: (theme: (path: string) => string) => ({
         DEFAULT: {
           css: {
             maxWidth: 'none',
@@ -56,3 +56,5 @@ export default {
   },
   plugins: [animate, typography],
 }
+
+export default config
