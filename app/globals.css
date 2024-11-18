@@ -2,26 +2,137 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground overflow-auto;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+.ProseMirror {
+  @apply h-full overflow-auto;
+  
+  > * + * {
+    margin-top: 0.5em;
   }
+
+  ul,
+  ol {
+    padding: 0 1rem;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    line-height: 1.1;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+  }
+
+  code {
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+    padding: 0.1em 0.3em;
+    border-radius: 0.2em;
+  }
+
+  pre {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-family: 'JetBrainsMono', monospace;
+    padding: 0.75rem 1rem;
+    border-radius: 0.3rem;
+
+    code {
+      color: inherit;
+      padding: 0;
+      background: none;
+      font-size: 0.8rem;
+    }
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  blockquote {
+    padding-left: 1rem;
+    border-left: 2px solid var(--border);
+    font-style: italic;
+    margin: 1rem 0;
+  }
+
+  hr {
+    border: none;
+    border-top: 2px solid var(--border);
+    margin: 2rem 0;
+  }
+}
+
+.heading-marker {
+  @apply text-primary font-mono text-sm mr-2;
+}
+
+.markdown-syntax {
+  @apply text-secondary-foreground;
+}
+
+.markdown-link {
+  @apply text-primary underline;
+}
+
+.markdown-image {
+  @apply max-w-full h-auto;
+}
+
+.markdown-code {
+  @apply bg-secondary text-secondary-foreground rounded px-1 py-0.5 font-mono text-sm;
+}
+
+.markdown-list {
+  @apply list-inside;
+}
+
+.markdown-list-item {
+  @apply mb-1;
 }

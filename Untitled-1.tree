@@ -1,0 +1,26 @@
+/workspaces/codespaces-blank/
+└── novel-editor/
+    ├─] .env.local (ignored)
+    ├── .eslintrc.json
+    ├── .gitignore
+    ├─] .next/ (ignored)
+    ├── README.md
+    ├── app/
+    │   ├── favicon.ico
+    │   ├── fonts/
+    │   │   ├── GeistMonoVF.woff
+    │   │   └── GeistVF.woff
+    │   ├── globals.css
+    │   ├── layout.tsx
+    │   └── page.tsx
+    ├── components.json
+    ├── lib/
+    │   └── utils.ts
+    ├─] next-env.d.ts (ignored)
+    ├── next.config.mjs
+    ├─] node_modules/ (ignored)
+    ├── package-lock.json
+    ├── package.json
+    ├── postcss.config.mjs
+    ├── tailwind.config.ts
+    └── tsconfig.json
