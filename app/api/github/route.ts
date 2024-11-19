@@ -84,8 +84,12 @@ async function handleFileOperation(operation: string, params: any) {
           path: params.oldPath,
         })
 
+        if (Array.isArray(content.data)) {
+          throw new Error('Cannot move a directory')
+        }
+
         if (!('content' in content.data)) {
-          throw new Error('Cannot move a non-file object')
+          throw new Error('Cannot move this type of object')
         }
 
         await octokit.repos.createOrUpdateFileContents({
@@ -96,6 +100,7 @@ async function handleFileOperation(operation: string, params: any) {
           content: content.data.content,
           sha: content.data.sha,
         })
+
         await handleFileOperation('deleteFile', {
           path: params.oldPath,
           sha: content.data.sha,
@@ -137,19 +142,34 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { path, content } = await request.json()
-    const existingFile = await octokit.repos.getContent({ owner, repo, path }).catch(() => null)
-
-    if (existingFile && 'sha' in existingFile.data) {
-      await handleFileOperation('updateFile', { path, content, sha: existingFile.data.sha })
-    } else {
-      await handleFileOperation('createFile', { path, content })
+    const { path, content, isFolder } = await request.json()
+    if (!path) {
+      return NextResponse.json({ error: 'Path is required' }, { status: 400 })
     }
 
-    return NextResponse.json({ message: 'File saved successfully' })
+    if (isFolder) {
+      // Create a .gitkeep file to represent an empty folder
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: `${path}/.gitkeep`,
+        message: `Create folder ${path}`,
+        content: Buffer.from('').toString('base64'),
+      })
+    } else {
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path,
+        message: `Create ${path}`,
+        content: Buffer.from(content || '').toString('base64'),
+      })
+    }
+
+    return NextResponse.json({ message: isFolder ? 'Folder created successfully' : 'File created successfully' })
   } catch (error) {
     console.error('Error in POST:', error)
-    return NextResponse.json({ error: 'Failed to save file' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
   }
 }
 
@@ -163,6 +183,11 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'File renamed successfully' })
   } catch (error) {
     console.error('Error in PUT:', error)
+    if (error instanceof Error) {
+      if (error.message === 'Cannot move a directory' || error.message === 'Cannot move this type of object') {
+        return NextResponse.json({ error: error.message }, { status: 400 })
+      }
+    }
     return NextResponse.json({ error: 'Failed to rename file' }, { status: 500 })
   }
 }
