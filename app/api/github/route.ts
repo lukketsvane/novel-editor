@@ -6,6 +6,8 @@ if (!process.env.GITHUB_PAT) {
   process.exit(1)
 }
 
+console.log('GITHUB_PAT length:', process.env.GITHUB_PAT.length)
+
 const octokit = new Octokit({ auth: process.env.GITHUB_PAT })
 const owner = 'lukketsvane'
 const repo = 'personal-web'
@@ -19,6 +21,8 @@ interface FileNode {
 
 async function fetchDirectoryContents(path: string): Promise<FileNode[]> {
   try {
+    console.log(`Fetching contents for path: ${path}`)
+    console.log('Request params:', { owner, repo, path })
     const { data } = await octokit.repos.getContent({ owner, repo, path })
     if (!Array.isArray(data)) throw new Error('Expected directory contents, received file')
     
@@ -35,6 +39,73 @@ async function fetchDirectoryContents(path: string): Promise<FileNode[]> {
     }))
   } catch (error) {
     console.error(`Error fetching contents for path ${path}:`, error)
+    if (error instanceof Error && 'status' in error && (error as any).status === 401) {
+      console.error('Authentication failed. Please check your GITHUB_PAT.')
+    }
+    throw error
+  }
+}
+
+async function handleFileOperation(operation: string, params: any) {
+  try {
+    switch (operation) {
+      case 'createFile':
+        await octokit.repos.createOrUpdateFileContents({
+          owner,
+          repo,
+          path: params.path,
+          message: `Create ${params.path}`,
+          content: Buffer.from(params.content).toString('base64'),
+        })
+        break
+      case 'updateFile':
+        await octokit.repos.createOrUpdateFileContents({
+          owner,
+          repo,
+          path: params.path,
+          message: `Update ${params.path}`,
+          content: Buffer.from(params.content).toString('base64'),
+          sha: params.sha,
+        })
+        break
+      case 'deleteFile':
+        await octokit.repos.deleteFile({
+          owner,
+          repo,
+          path: params.path,
+          message: `Delete ${params.path}`,
+          sha: params.sha,
+        })
+        break
+      case 'moveFile':
+        const content = await octokit.repos.getContent({
+          owner,
+          repo,
+          path: params.oldPath,
+        })
+
+        if (!('content' in content.data)) {
+          throw new Error('Cannot move a non-file object')
+        }
+
+        await octokit.repos.createOrUpdateFileContents({
+          owner,
+          repo,
+          path: params.newPath,
+          message: `Move ${params.oldPath} to ${params.newPath}`,
+          content: content.data.content,
+          sha: content.data.sha,
+        })
+        await handleFileOperation('deleteFile', {
+          path: params.oldPath,
+          sha: content.data.sha,
+        })
+        break
+      default:
+        throw new Error(`Unsupported operation: ${operation}`)
+    }
+  } catch (error) {
+    console.error(`Error in ${operation}:`, error)
     throw error
   }
 }
@@ -45,22 +116,14 @@ export async function GET(request: Request) {
 
   try {
     if (path) {
-      try {
-        const { data } = await octokit.repos.getContent({ owner, repo, path })
-        if ('content' in data) {
-          return NextResponse.json({
-            content: data.content,
-            encoding: data.encoding,
-            sha: data.sha,
-          })
-        } else {
-          throw new Error('Requested path is not a file')
-        }
-      } catch (error) {
-        if (error instanceof Error && 'status' in error && (error as any).status === 404) {
-          return NextResponse.json({ error: 'File not found' }, { status: 404 })
-        }
-        throw error
+      const { data } = await octokit.repos.getContent({ owner, repo, path })
+      if ('content' in data) {
+        return NextResponse.json({
+          content: Buffer.from(data.content, 'base64').toString('utf-8'),
+          sha: data.sha,
+        })
+      } else {
+        throw new Error('Requested path is not a file')
       }
     } else {
       const files = await fetchDirectoryContents('')
@@ -74,99 +137,46 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { path, content, isFolder } = await request.json()
-    if (!path) {
-      return NextResponse.json({ error: 'Path is required' }, { status: 400 })
-    }
+    const { path, content } = await request.json()
+    const existingFile = await octokit.repos.getContent({ owner, repo, path }).catch(() => null)
 
-    if (isFolder) {
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path: `${path}/.gitkeep`,
-        message: `Create folder ${path}`,
-        content: Buffer.from('').toString('base64'),
-      })
+    if (existingFile && 'sha' in existingFile.data) {
+      await handleFileOperation('updateFile', { path, content, sha: existingFile.data.sha })
     } else {
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path,
-        message: `Create ${path}`,
-        content: Buffer.from(content || '').toString('base64'),
-      })
+      await handleFileOperation('createFile', { path, content })
     }
 
-    return NextResponse.json({ message: isFolder ? 'Folder created successfully' : 'File created successfully' })
+    return NextResponse.json({ message: 'File saved successfully' })
   } catch (error) {
     console.error('Error in POST:', error)
-    return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save file' }, { status: 500 })
   }
 }
 
 export async function PUT(request: Request) {
   try {
     const { oldPath, newName } = await request.json()
-    if (!oldPath || !newName) {
-      return NextResponse.json({ error: 'Old path and new name are required' }, { status: 400 })
-    }
-
     const newPath = oldPath.split('/').slice(0, -1).concat(newName).join('/')
 
-    const { data: content } = await octokit.repos.getContent({ owner, repo, path: oldPath })
+    await handleFileOperation('moveFile', { oldPath, newPath })
 
-    if (Array.isArray(content) || !('content' in content)) {
-      return NextResponse.json({ error: 'Cannot move a directory or non-file object' }, { status: 400 })
-    }
-
-    await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
-      path: newPath,
-      message: `Move ${oldPath} to ${newPath}`,
-      content: content.content,
-      sha: content.sha,
-    })
-
-    await octokit.repos.deleteFile({
-      owner,
-      repo,
-      path: oldPath,
-      message: `Delete ${oldPath} after moving to ${newPath}`,
-      sha: content.sha,
-    })
-
-    return NextResponse.json({ message: 'File moved successfully' })
+    return NextResponse.json({ message: 'File renamed successfully' })
   } catch (error) {
     console.error('Error in PUT:', error)
-    return NextResponse.json({ error: 'Failed to move file', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to rename file' }, { status: 500 })
   }
 }
 
 export async function DELETE(request: Request) {
   try {
-    const { path, confirmDelete } = await request.json()
-    if (!path) {
-      return NextResponse.json({ error: 'Path is required' }, { status: 400 })
-    }
+    const { path } = await request.json()
+    const { data } = await octokit.repos.getContent({ owner, repo, path })
 
-    if (!confirmDelete) {
-      return NextResponse.json({ message: 'Deletion requires confirmation' }, { status: 400 })
-    }
-
-    const { data: content } = await octokit.repos.getContent({ owner, repo, path })
-
-    if (!('sha' in content)) {
+    if (!('sha' in data)) {
       throw new Error('Cannot delete a non-file object')
     }
 
-    await octokit.repos.deleteFile({
-      owner,
-      repo,
-      path,
-      message: `Delete ${path}`,
-      sha: content.sha,
-    })
+    await handleFileOperation('deleteFile', { path, sha: data.sha })
 
     return NextResponse.json({ message: 'File deleted successfully' })
   } catch (error) {
