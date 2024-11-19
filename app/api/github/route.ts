@@ -74,36 +74,33 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { path, content } = await request.json()
-    if (!path || content === undefined) {
-      return NextResponse.json({ error: 'Path and content are required' }, { status: 400 })
-    }
-    let sha: string | undefined
-
-    try {
-      const { data } = await octokit.repos.getContent({ owner, repo, path })
-      if ('sha' in data) {
-        sha = data.sha
-      }
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status !== 404) {
-        throw error
-      }
+    const { path, content, isFolder } = await request.json()
+    if (!path) {
+      return NextResponse.json({ error: 'Path is required' }, { status: 400 })
     }
 
-    const { data } = await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
-      path,
-      message: sha ? `Update ${path}` : `Create ${path}`,
-      content: content,
-      sha,
-    })
+    if (isFolder) {
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: `${path}/.gitkeep`,
+        message: `Create folder ${path}`,
+        content: Buffer.from('').toString('base64'),
+      })
+    } else {
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path,
+        message: `Create ${path}`,
+        content: Buffer.from(content || '').toString('base64'),
+      })
+    }
 
-    return NextResponse.json({ message: sha ? 'File updated successfully' : 'File created successfully', data })
+    return NextResponse.json({ message: isFolder ? 'Folder created successfully' : 'File created successfully' })
   } catch (error) {
     console.error('Error in POST:', error)
-    return NextResponse.json({ error: 'Failed to update file' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
   }
 }
 
