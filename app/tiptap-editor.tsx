@@ -22,8 +22,15 @@ export default function TiptapEditor({ onSave, initialContent }: TiptapEditorPro
       StarterKit,
       Link.configure({
         openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-primary underline',
+        },
       }),
-      Image,
+      Image.configure({
+        HTMLAttributes: {
+          class: 'max-w-full h-auto rounded-lg',
+        },
+      }),
       Markdown.configure({
         html: true,
         tightLists: true,
@@ -63,6 +70,20 @@ export default function TiptapEditor({ onSave, initialContent }: TiptapEditorPro
     editor?.chain().focus().toggleHeading({ level }).run()
   }, [editor])
 
+  const addImage = useCallback(() => {
+    const url = window.prompt('Enter the image URL')
+    if (url) {
+      editor?.chain().focus().setImage({ src: url }).run()
+    }
+  }, [editor])
+
+  const addLink = useCallback(() => {
+    const url = window.prompt('Enter the URL')
+    if (url) {
+      editor?.chain().focus().setLink({ href: url }).run()
+    }
+  }, [editor])
+
   if (!isMounted) {
     return null
   }
@@ -83,43 +104,25 @@ export default function TiptapEditor({ onSave, initialContent }: TiptapEditorPro
         <Button variant="ghost" size="sm" onClick={() => setHeading(3)}>
           <Heading3 className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()}>
+        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} aria-label="Bold">
           <Bold className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} aria-label="Italic">
           <Italic className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleCode().run()}>
+        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleCode().run()} aria-label="Code">
           <Code className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBulletList().run()}>
+        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBulletList().run()} aria-label="Bullet List">
           <List className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+        <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleOrderedList().run()} aria-label="Ordered List">
           <ListOrdered className="w-4 h-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            const url = window.prompt('Enter the URL')
-            if (url) {
-              editor.chain().focus().setLink({ href: url }).run()
-            }
-          }}
-        >
+        <Button variant="ghost" size="sm" onClick={addLink} aria-label="Add Link">
           <LinkIcon className="w-4 h-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            const url = window.prompt('Enter the image URL')
-            if (url) {
-              editor.chain().focus().setImage({ src: url }).run()
-            }
-          }}
-        >
+        <Button variant="ghost" size="sm" onClick={addImage} aria-label="Add Image">
           <ImageIcon className="w-4 h-4" />
         </Button>
       </div>
@@ -128,25 +131,16 @@ export default function TiptapEditor({ onSave, initialContent }: TiptapEditorPro
       </div>
       {editor && (
         <BubbleMenu className="flex bg-white shadow-lg rounded-lg overflow-hidden dark:bg-gray-800" editor={editor}>
-          <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()}>
+          <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} aria-label="Bold">
             <Bold className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()}>
+          <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} aria-label="Italic">
             <Italic className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleCode().run()}>
+          <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleCode().run()} aria-label="Code">
             <Code className="w-4 h-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const url = window.prompt('Enter the URL')
-              if (url) {
-                editor.chain().focus().setLink({ href: url }).run()
-              }
-            }}
-          >
+          <Button variant="ghost" size="sm" onClick={addLink} aria-label="Add Link">
             <LinkIcon className="w-4 h-4" />
           </Button>
         </BubbleMenu>
