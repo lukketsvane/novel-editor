@@ -1,16 +1,10 @@
 'use client'
 
-import { useState, useCallback, KeyboardEvent, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Folder, File, ChevronRight, ChevronDown, Upload, Loader, Plus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 
 interface FileNode {
   name: string
@@ -26,10 +20,7 @@ interface FileBrowserProps {
 export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-  const [editingPath, setEditingPath] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [creatingFile, setCreatingFile] = useState<{ path: string; isFolder: boolean } | null>(null)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -66,42 +57,6 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
       }
       return newSet
     })
-  }
-
-  const handleDoubleClick = (path: string, name: string) => {
-    setEditingPath(path)
-    setEditingName(name)
-  }
-
-  const handleRename = async (oldPath: string, newName: string) => {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/github', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oldPath, newName }),
-      })
-      if (response.ok) {
-        fetchFiles()
-        toast({
-          title: "Success",
-          description: "Item renamed successfully",
-        })
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to rename item')
-      }
-    } catch (error) {
-      console.error('Error renaming item:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to rename item",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-      setEditingPath(null)
-    }
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,114 +96,65 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
     reader.readAsDataURL(file)
   }
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>, path: string) => {
-    if (e.key === 'Enter' && editingPath === path) {
-      handleRename(path, editingName)
-    }
-  }
+  const handleCreateFile = async () => {
+    const fileName = prompt("Enter the new file name:")
+    if (!fileName) return
 
-  const handleCreateFile = async (path: string, isFolder: boolean) => {
-    setCreatingFile({ path, isFolder })
-  }
-
-  const handleCreateFileSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!creatingFile) return
-
-    const newPath = `${creatingFile.path}/${editingName}`
     setIsLoading(true)
     try {
       const response = await fetch('/api/github', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          path: newPath, 
-          content: creatingFile.isFolder ? '' : 'New file content',
-          isFolder: creatingFile.isFolder
+          path: fileName, 
+          content: ''
         }),
       })
-      if (!response.ok) throw new Error('Failed to create item')
+      if (!response.ok) throw new Error('Failed to create file')
       toast({
         title: "Success",
-        description: `${creatingFile.isFolder ? 'Folder' : 'File'} created successfully`,
+        description: "File created successfully",
       })
       fetchFiles()
     } catch (error) {
-      console.error('Error creating item:', error)
+      console.error('Error creating file:', error)
       toast({
         title: "Error",
-        description: `Failed to create ${creatingFile.isFolder ? 'folder' : 'file'}`,
+        description: "Failed to create file",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
-      setCreatingFile(null)
-      setEditingName('')
     }
   }
 
   const renderFileTree = (nodes: FileNode[], level = 0) => {
     return nodes.map((node) => (
-      <ContextMenu key={node.path}>
-        <ContextMenuTrigger>
-          <div 
-            style={{ marginLeft: `${level * 20}px` }} 
-            onKeyDown={(e) => handleKeyDown(e, node.path)}
-          >
-            {node.type === 'dir' ? (
-              <div>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => toggleFolder(node.path)}
-                  onDoubleClick={() => handleDoubleClick(node.path, node.name)}
-                >
-                  {expandedFolders.has(node.path) ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
-                  <Folder className="w-4 h-4 mr-2" />
-                  {editingPath === node.path ? (
-                    <Input
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onBlur={() => handleRename(node.path, editingName)}
-                      autoFocus
-                    />
-                  ) : (
-                    node.name
-                  )}
-                </Button>
-                {expandedFolders.has(node.path) && node.children && renderFileTree(node.children, level + 1)}
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => onFileSelect(node.path)}
-                onDoubleClick={() => handleDoubleClick(node.path, node.name)}
-              >
-                <File className="w-4 h-4 mr-2" />
-                {editingPath === node.path ? (
-                  <Input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={() => handleRename(node.path, editingName)}
-                    autoFocus
-                  />
-                ) : (
-                  node.name
-                )}
-              </Button>
-            )}
+      <div key={node.path} style={{ marginLeft: `${level * 20}px` }}>
+        {node.type === 'dir' ? (
+          <div>
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => toggleFolder(node.path)}
+            >
+              {expandedFolders.has(node.path) ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
+              <Folder className="w-4 h-4 mr-2" />
+              {node.name}
+            </Button>
+            {expandedFolders.has(node.path) && node.children && renderFileTree(node.children, level + 1)}
           </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onSelect={() => handleCreateFile(node.path, false)}>
-            New File
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={() => handleCreateFile(node.path, true)}>
-            New Folder
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+        ) : (
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => onFileSelect(node.path)}
+          >
+            <File className="w-4 h-4 mr-2" />
+            {node.name}
+          </Button>
+        )}
+      </div>
     ))
   }
 
@@ -256,7 +162,7 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
     <div className="h-full overflow-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Repository Files</h2>
-        <div>
+        <div className="flex gap-2">
           <input
             type="file"
             id="file-upload"
@@ -266,16 +172,23 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
           />
           <Button 
             variant="outline" 
-            size="sm" 
+            size="icon" 
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
           >
             {isLoading ? (
-              <Loader className="w-4 h-4 mr-2 animate-spin" />
+              <Loader className="w-4 h-4 animate-spin" />
             ) : (
-              <Upload className="w-4 h-4 mr-2" />
+              <Upload className="w-4 h-4" />
             )}
-            Upload File
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleCreateFile}
+            disabled={isLoading}
+          >
+            <Plus className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -286,19 +199,6 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
       ) : (
         renderFileTree(files)
       )}
-      {creatingFile && (
-        <form onSubmit={handleCreateFileSubmit} className="mt-4">
-          <Input
-            value={editingName}
-            onChange={(e) => setEditingName(e.target.value)}
-            placeholder={`New ${creatingFile.isFolder ? 'folder' : 'file'} name`}
-            autoFocus
-          />
-          <Button type="submit" className="mt-2">
-            Create {creatingFile.isFolder ? 'Folder' : 'File'}
-          </Button>
-        </form>
-      )}
     </div>
   )
-} 
+}

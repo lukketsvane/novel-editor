@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -19,30 +19,22 @@ import {
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
 interface FrontmatterHeaderProps {
-  onUpdate: (frontmatter: string) => void
+  frontmatter: Record<string, any>;
+  onUpdate: (frontmatter: Record<string, any>) => void;
 }
 
-export default function FrontmatterHeader({ onUpdate }: FrontmatterHeaderProps) {
+export default function FrontmatterHeader({ frontmatter, onUpdate }: FrontmatterHeaderProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [date, setDate] = useState('')
-  const [tags, setTags] = useState('')
-  const [type, setType] = useState('')
-  const [category, setCategory] = useState('')
-  const [image, setImage] = useState('')
+  const [fields, setFields] = useState(frontmatter)
 
-  const updateFrontmatter = () => {
-    const frontmatter = `---
-title: ${title}
-description: ${description}
-date: ${date}
-tags: [${tags}]
-type: ${type}
-category: ${category}
-image: ${image}
----`
-    onUpdate(frontmatter)
+  useEffect(() => {
+    setFields(frontmatter)
+  }, [frontmatter])
+
+  const handleChange = (key: string, value: any) => {
+    const updatedFields = { ...fields, [key]: value }
+    setFields(updatedFields)
+    onUpdate(updatedFields)
   }
 
   return (
@@ -57,23 +49,24 @@ image: ${image}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <Label htmlFor="title" className="text-xs">Title</Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="h-8" />
+            <Input id="title" value={fields.title || ''} onChange={(e) => handleChange('title', e.target.value)} className="h-8" />
           </div>
           <div>
             <Label htmlFor="description" className="text-xs">Description</Label>
-            <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="h-8" />
+            <Input id="description" value={fields.description || ''} onChange={(e) => handleChange('description', e.target.value)} className="h-8" />
           </div>
           <div>
             <Label htmlFor="date" className="text-xs">Date</Label>
-            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8" />
+            <Input id="date" type="date" value={fields.date || ''} onChange={(e) => handleChange('date', e.target.value)} className="h-8" />
           </div>
           <div>
             <Label htmlFor="tags" className="text-xs">Tags</Label>
-            <Input id="tags" value={tags} onChange={(e) => setTags(e.target.value)} className="h-8" />
+            <Input id="tags" value={Array.isArray(fields.tags) ? fields.tags.join(', ') : fields.tags || ''} 
+           onChange={(e) => handleChange('tags', e.target.value.split(',').map(tag => tag.trim()))} className="h-8" />
           </div>
           <div>
             <Label htmlFor="type" className="text-xs">Type</Label>
-            <Select onValueChange={setType} value={type}>
+            <Select onValueChange={(value) => handleChange('type', value)} value={fields.type || ''}>
               <SelectTrigger className="h-8">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -86,14 +79,13 @@ image: ${image}
           </div>
           <div>
             <Label htmlFor="category" className="text-xs">Category</Label>
-            <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="h-8" />
+            <Input id="category" value={fields.category || ''} onChange={(e) => handleChange('category', e.target.value)} className="h-8" />
           </div>
           <div className="col-span-2">
             <Label htmlFor="image" className="text-xs">Image URL</Label>
-            <Input id="image" value={image} onChange={(e) => setImage(e.target.value)} className="h-8" />
+            <Input id="image" value={fields.image || ''} onChange={(e) => handleChange('image', e.target.value)} className="h-8" />
           </div>
         </div>
-        <Button onClick={updateFrontmatter} className="w-full mt-2">Update Frontmatter</Button>
       </CollapsibleContent>
     </Collapsible>
   )
