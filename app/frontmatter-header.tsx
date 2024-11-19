@@ -17,15 +17,22 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useToast } from "@/hooks/use-toast"
 
-interface FrontmatterHeaderProps {
-  frontmatter: Record<string, any>;
-  onUpdate: (frontmatter: Record<string, any>) => void;
+interface Frontmatter {
+  [key: string]: string | string[];
 }
 
-export default function FrontmatterHeader({ frontmatter, onUpdate }: FrontmatterHeaderProps) {
+interface FrontmatterHeaderProps {
+  frontmatter: Frontmatter;
+  onUpdate: (frontmatter: Frontmatter) => void;
+  filePath: string;
+}
+
+export default function FrontmatterHeader({ frontmatter, onUpdate, filePath }: FrontmatterHeaderProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [fields, setFields] = useState(frontmatter)
+  const { toast } = useToast()
 
   useEffect(() => {
     setFields(frontmatter)
@@ -35,6 +42,32 @@ export default function FrontmatterHeader({ frontmatter, onUpdate }: Frontmatter
     const updatedFields = { ...fields, [key]: value }
     setFields(updatedFields)
     onUpdate(updatedFields)
+  }
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch('/api/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          path: filePath,
+          frontmatter: fields,
+          action: 'updateFrontmatter'
+        }),
+      })
+      if (!response.ok) throw new Error('Failed to save frontmatter')
+      toast({
+        title: "Success",
+        description: "Frontmatter saved successfully",
+      })
+    } catch (error) {
+      console.error('Error saving frontmatter:', error)
+      toast({
+        title: "Error",
+        description: "Failed to save frontmatter",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -66,7 +99,7 @@ export default function FrontmatterHeader({ frontmatter, onUpdate }: Frontmatter
           </div>
           <div>
             <Label htmlFor="type" className="text-xs">Type</Label>
-            <Select onValueChange={(value) => handleChange('type', value)} value={fields.type || ''}>
+            <Select onValueChange={(value) => handleChange('type', value)} value={fields.type as string || ''}>
               <SelectTrigger className="h-8">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -86,6 +119,7 @@ export default function FrontmatterHeader({ frontmatter, onUpdate }: Frontmatter
             <Input id="image" value={fields.image || ''} onChange={(e) => handleChange('image', e.target.value)} className="h-8" />
           </div>
         </div>
+        <Button onClick={handleSave} className="mt-2">Save Frontmatter</Button>
       </CollapsibleContent>
     </Collapsible>
   )

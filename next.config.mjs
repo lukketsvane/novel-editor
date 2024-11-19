@@ -3,11 +3,24 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['novel'],
   images: {
-    domains: ['i.ibb.co', 'github.com', 'raw.githubusercontent.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.ibb.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'github.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+      },
+    ],
   },
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000'],
+      allowedOrigins: ['localhost:3000', 'novel.iverfinne.no'],
     },
   },
 };

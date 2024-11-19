@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Folder, File, ChevronRight, ChevronDown, Upload, Loader, Plus } from 'lucide-react'
+import { Folder, File, ChevronRight, ChevronDown, Upload, Loader, Plus, ImageIcon } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
+import Image from 'next/image'
 
 interface FileNode {
   name: string
@@ -17,12 +18,16 @@ interface FileBrowserProps {
   onFileSelect: (path: string) => void
 }
 
+const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp']
+
 export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(false)
+  const [editingPath, setEditingPath] = useState<string | null>(null)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   const fetchFiles = useCallback(async () => {
     setIsLoading(true)
@@ -46,6 +51,12 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
+
+  useEffect(() => {
+    if (editingPath && renameInputRef.current) {
+      renameInputRef.current.focus()
+    }
+  }, [editingPath])
 
   const toggleFolder = (path: string) => {
     setExpandedFolders(prev => {
@@ -128,32 +139,82 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
     }
   }
 
+  const handleRename = async (oldPath: string, newName: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/github', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPath, newName }),
+      })
+      if (!response.ok) throw new Error('Failed to rename file/folder')
+      toast({
+        title: "Success",
+        description: "File/folder renamed successfully",
+      })
+      fetchFiles()
+    } catch (error) {
+      console.error('Error renaming file/folder:', error)
+      toast({
+        title: "Error",
+        description: "Failed to rename file/folder",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+      setEditingPath(null)
+    }
+  }
+
+  const isImageFile = (fileName: string) => {
+    const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase()
+    return imageExtensions.includes(extension)
+  }
+
   const renderFileTree = (nodes: FileNode[], level = 0) => {
     return nodes.map((node) => (
       <div key={node.path} style={{ marginLeft: `${level * 20}px` }}>
-        {node.type === 'dir' ? (
-          <div>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => toggleFolder(node.path)}
-            >
-              {expandedFolders.has(node.path) ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
-              <Folder className="w-4 h-4 mr-2" />
-              {node.name}
-            </Button>
-            {expandedFolders.has(node.path) && node.children && renderFileTree(node.children, level + 1)}
-          </div>
+        {editingPath === node.path ? (
+          <Input
+            ref={renameInputRef}
+            defaultValue={node.name}
+            className="h-8 w-full"
+            onBlur={(e) => handleRename(node.path, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleRename(node.path, e.currentTarget.value)
+              } else if (e.key === 'Escape') {
+                setEditingPath(null)
+              }
+            }}
+          />
         ) : (
           <Button
             variant="ghost"
             className="w-full justify-start"
-            onClick={() => onFileSelect(node.path)}
+            onClick={() => node.type === 'dir' ? toggleFolder(node.path) : onFileSelect(node.path)}
+            onDoubleClick={() => setEditingPath(node.path)}
           >
-            <File className="w-4 h-4 mr-2" />
+            {node.type === 'dir' && (expandedFolders.has(node.path) ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />)}
+            {node.type === 'dir' ? (
+              <Folder className="w-4 h-4 mr-2" />
+            ) : isImageFile(node.name) ? (
+              <div className="w-6 h-6 mr-2 relative">
+                <Image
+                  src={`/api/github?path=${encodeURIComponent(node.path)}`}
+                  alt={node.name}
+                  layout="fill"
+                  objectFit="cover"
+                  className="rounded"
+                />
+              </div>
+            ) : (
+              <File className="w-4 h-4 mr-2" />
+            )}
             {node.name}
           </Button>
         )}
+        {node.type === 'dir' && expandedFolders.has(node.path) && node.children && renderFileTree(node.children, level + 1)}
       </div>
     ))
   }
@@ -161,7 +222,6 @@ export default function FileBrowser({ onFileSelect }: FileBrowserProps) {
   return (
     <div className="h-full overflow-auto p-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Repository Files</h2>
         <div className="flex gap-2">
           <input
             type="file"

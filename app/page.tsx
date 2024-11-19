@@ -7,10 +7,14 @@ import FileBrowser from './file-browser'
 import FrontmatterHeader from './frontmatter-header'
 import { Textarea } from "@/components/ui/textarea"
 
+interface Frontmatter {
+  [key: string]: string | string[];
+}
+
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [content, setContent] = useState('')
-  const [frontmatter, setFrontmatter] = useState<Record<string, any>>({})
+  const [frontmatter, setFrontmatter] = useState<Frontmatter>({})
   const { toast } = useToast()
 
   const handleFileSelect = async (path: string) => {
@@ -61,14 +65,14 @@ export default function Home() {
     }
   }
 
-  const parseFrontmatter = (rawContent: string) => {
+  const parseFrontmatter = (rawContent: string): { frontmatter: Frontmatter; content: string } => {
     const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/
     const match = rawContent.match(frontmatterRegex)
     
     if (match) {
       const frontmatterString = match[1]
       const content = rawContent.slice(match[0].length)
-      const frontmatter = {}
+      const frontmatter: Frontmatter = {}
       frontmatterString.split('\n').forEach(line => {
         const [key, ...valueParts] = line.split(':').map(part => part.trim())
         const value = valueParts.join(':').trim()
@@ -95,6 +99,7 @@ export default function Home() {
             <FrontmatterHeader
               frontmatter={frontmatter}
               onUpdate={setFrontmatter}
+              filePath={selectedFile}
             />
             <Textarea
               value={content}
